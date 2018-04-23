@@ -3,7 +3,7 @@
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!-- 模块名 -->
 <mapper namespace="budget">
-    <select id="getBudgetDetail" resultType="pccw.wj.budget.bean.BudgetAccount" parameterType="Map">
+    <select id="getBudgetDetail" resultType="root.wj.budget.bean.BudgetAccount" parameterType="Map">
    WITH
     tb
     (

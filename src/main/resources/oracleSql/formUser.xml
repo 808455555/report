@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="formUser">
-	<resultMap type="pccw.form.user.UserModel" id="userModel">
+	<resultMap type="root.form.user.UserModel" id="userModel">
 	   <result column="_ID" property="id" javaType="int" jdbcType="VARCHAR"></result>
 	   <result column="USER_ID" property="userId" javaType="string" jdbcType="VARCHAR"></result>
 	   <result column="USER_NAME" property="userName" javaType="string" jdbcType="VARCHAR"></result>

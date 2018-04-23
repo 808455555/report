@@ -79,7 +79,7 @@
         SELECT COLUMN_NAME,DATA_TYPE,replace(COLUMN_KEY,'PRI',0) as COLUMN_KEY FROM information_schema.COLUMNS WHERE table_name = '${tableName}' AND table_schema = 'form';
 	</select>
 	
-	<insert id="insertDBEntityBatch" parameterType="pccw.form.datatable.TableEntitySql">
+	<insert id="insertDBEntityBatch" parameterType="root.form.datatable.TableEntitySql">
 			insert into <if test="database!=null">${database}.</if>${tableName}   
 				<foreach collection="cols" item="eachCol" separator="," open="(" close=")">  
                         ${eachCol.dbColName}  
@@ -113,7 +113,7 @@
 		     )
 	</delete>
     
-	<update id="modifyDBEntityBatch" parameterType="pccw.form.datatable.TableEntitySql">
+	<update id="modifyDBEntityBatch" parameterType="root.form.datatable.TableEntitySql">
 			update  <if test="database!=null">${database}.</if>${tableName}   
                            set
 			<foreach collection="cols" item="eachCol" separator="," > 

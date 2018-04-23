@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 模块名 -->
+<mapper namespace="budget">
+    <select id="getBudgetDetail" resultType="pccw.wj.budget.bean.BudgetAccount" parameterType="Map">
+   WITH
+    tb
+    (
+        BUDGET_ACCOUNT_ID,
+        PARENT_BUDGET_ACCOUNT_ID,
+        BUDGET_ACCOUNT_CODE,
+        BUDGET_ACCOUNT_NAME
+    ) AS
+    (
+        SELECT
+            TBA.BUDGET_ACCOUNT_ID,
+            TBA.PARENT_BUDGET_ACCOUNT_ID,
+            TBA.BUDGET_ACCOUNT_CODE,
+            TTR.CUST_TEXT10 BUDGET_ACCOUNT_NAME
+        FROM
+            TBM_TEMPLATES TT
+        LEFT JOIN
+            TBM_TEMPLATE_LAYOUTS TTL
+        ON
+            TT.TEMPLATE_ID=TTL.TEMPLATE_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROW_SETS TTRS
+        ON
+            TTL.TEMPLATE_ROW_SET_ID=TTRS.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROWS TTR
+        ON
+            TTRS.TEMPLATE_ROW_SET_ID=TTR.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_BUDGET_ACCOUNTS TBA
+        ON
+            TTR.DIMENSION_VALUE_ID=TBA.BUDGET_ACCOUNT_ID
+        AND TTRS.BUDGET_ACCOUNT_SET_ID=TBA.BUDGET_ACCOUNT_SET_ID
+        LEFT JOIN
+            TBM_PROPERTIES_SET_VALUE TPSV
+        ON
+            TPSV.PROPERTY_SET_VALUE=TT.TEMPLATE_NUMBER
+        WHERE
+            TPSV.PROPERTY_SET_VALUE_CODE ='HB_CURRENT_TEMPLATE_NUMBER'
+        AND TBA.BUDGET_ACCOUNT_CODE='EBPL01'
+        AND TBA.ENABLED_FLAG='Y'
+        AND TBA.BUDGET_ACCOUNT_CODE != 'EBPL0198'
+        AND TBA.BUDGET_ACCOUNT_CODE != 'EBPL0199'
+        UNION ALL
+        SELECT
+            CHILD.BUDGET_ACCOUNT_ID,
+            CHILD.PARENT_BUDGET_ACCOUNT_ID,
+            CHILD.BUDGET_ACCOUNT_CODE,
+            CHILD.BUDGET_ACCOUNT_NAME
+        FROM
+            tb PARENT ,
+            ( SELECT
+            TBA.BUDGET_ACCOUNT_ID,
+            TBA.PARENT_BUDGET_ACCOUNT_ID,
+            TBA.BUDGET_ACCOUNT_CODE,
+            TTR.CUST_TEXT10 BUDGET_ACCOUNT_NAME
+        FROM
+            TBM_TEMPLATES TT
+        LEFT JOIN
+            TBM_TEMPLATE_LAYOUTS TTL
+        ON
+            TT.TEMPLATE_ID=TTL.TEMPLATE_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROW_SETS TTRS
+        ON
+            TTL.TEMPLATE_ROW_SET_ID=TTRS.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROWS TTR
+        ON
+            TTRS.TEMPLATE_ROW_SET_ID=TTR.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_BUDGET_ACCOUNTS TBA
+        ON
+            TTR.DIMENSION_VALUE_ID=TBA.BUDGET_ACCOUNT_ID
+        AND TTRS.BUDGET_ACCOUNT_SET_ID=TBA.BUDGET_ACCOUNT_SET_ID
+        LEFT JOIN
+            TBM_PROPERTIES_SET_VALUE TPSV
+        ON
+            TPSV.PROPERTY_SET_VALUE=TT.TEMPLATE_NUMBER
+        WHERE
+            TPSV.PROPERTY_SET_VALUE_CODE ='HB_CURRENT_TEMPLATE_NUMBER'
+        ) CHILD
+        WHERE
+            CHILD.PARENT_BUDGET_ACCOUNT_ID=PARENT.BUDGET_ACCOUNT_ID
+    )
+	SELECT
+		pa.company_id,
+	    pa.company_name,
+	    pa.BUDGET_ACCOUNT_NAME,
+	    pa.BUDGET_ACCOUNT_CODE,
+	    CAST(COALESCE(ba.TRANSMIT_BUDGET_AMOUNT,0) AS DECIMAL(30,2)) TRANSMIT_BUDGET_AMOUNT,
+	    CAST(COALESCE(ab.APPROVED_BUDGET_AMOUNT,0) AS DECIMAL(30,2)) APPROVED_BUDGET_AMOUNT,
+	    CAST(COALESCE(ac.ACTUAL_AMOUNT,0) AS DECIMAL(30,2))          ACCOUNT_AMOUNT,
+	    CAST(COALESCE(ad.AMOUNT,0) AS DECIMAL(30,2))                 CLAIM_AMOUNT
+	FROM
+	    (
+	        SELECT
+	        	tc.company_id,
+	            tc.company_name,
+	            tc.company_code,
+	            tbc.BUDGET_ACCOUNT_NAME,
+	            tbc.BUDGET_ACCOUNT_CODE
+	        FROM
+	            (SELECT BUDGET_ACCOUNT_NAME,BUDGET_ACCOUNT_CODE FROM tb
+	            UNION
+	            SELECT '2.网间结算支出' BUDGET_ACCOUNT_NAME,'EBPL010402' BUDGET_ACCOUNT_CODE FROM tb) tbc,
+	            tbm_companies tc
+	        WHERE
+	        1=1
+	        <choose>
+		        <when test="companycodes!=null">
+		       and tc.COMPANY_CODE in (${companycodes})
+		        </when>
+		        <otherwise>
+		       and tc.COMPANY_CODE in ('')
+		        </otherwise>
+		    </choose>
+	         )pa
+	LEFT JOIN
+	    (
+	        SELECT
+	            a.COMPANY_ID,
+	            c.BUDGET_ACCOUNT_CODE,
+	            SUM(a.TRANSMIT_BUDGET_AMOUNT) TRANSMIT_BUDGET_AMOUNT
+	        FROM
+	            TBM_BUDGET_ANNUAL_DIMVAL_SUMMARY a
+	        INNER JOIN
+	            TBM_DIMVAL_SUB_COMBINATIONS b
+	        ON
+	            a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        WHERE
+	            a.budget_year=${budget_year}
+	        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+	        AND a.BUDGET_VERSION_TYPE = 'Z'
+	        GROUP BY
+	            a.budget_year,
+	            a.COMPANY_ID,
+	            c.BUDGET_ACCOUNT_CODE
+	         union 
+	             SELECT
+	            a.COMPANY_ID,
+	            'EBPL010402' BUDGET_ACCOUNT_CODE ,
+	            SUM(a.TRANSMIT_BUDGET_AMOUNT) TRANSMIT_BUDGET_AMOUNT
+	        FROM
+	            TBM_BUDGET_ANNUAL_DIMVAL_SUMMARY a
+	        INNER JOIN
+	            TBM_DIMVAL_SUB_COMBINATIONS b
+	        ON
+	            a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        WHERE
+	            a.budget_year=${budget_year}
+	        AND c.BUDGET_ACCOUNT_CODE='EBPL01040202'
+	        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+	        AND a.BUDGET_VERSION_TYPE = 'Z'
+	        GROUP BY
+	            a.budget_year,
+	            a.COMPANY_ID,
+	            c.BUDGET_ACCOUNT_CODE
+	        )ba
+	ON
+	    ba.COMPANY_ID=pa.COMPANY_ID
+	AND ba.BUDGET_ACCOUNT_CODE=pa.BUDGET_ACCOUNT_CODE
+	LEFT JOIN
+	    (
+	        SELECT
+	            a.COMPANY_ID,
+	            tb.BUDGET_ACCOUNT_CODE,
+	            ROUND(SUM(
+	                CASE
+	                    WHEN COALESCE(a.APPROVED_BUDGET_AMOUNT, 0) = 0
+	                    THEN MIN(COALESCE(a.INPROCESS_BUDGET_AMOUNT, 0), COALESCE(a.OLD_AMOUNT, 0))
+	                    ELSE a.APPROVED_BUDGET_AMOUNT
+	                END ),2) APPROVED_BUDGET_AMOUNT
+	        FROM
+	            tbm_budget_project_summary a
+	        INNER JOIN
+	            TBM_DIMVAL_SUB_COMBINATIONS b
+	        ON
+	            a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            TBM_DIMENSION_MAPS m
+	        ON
+	            m.SOURCE_DIMENSION_VALUE_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            tb
+	        ON
+	            m.TARGET_DIMENSION_VALUE_ID=tb.BUDGET_ACCOUNT_ID
+	        WHERE
+	            1=1
+	        AND a.BUDGET_YEAR=${budget_year}
+	        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+	        GROUP BY
+	            a.COMPANY_ID,
+	            tb.BUDGET_ACCOUNT_CODE)ab
+	ON
+	    ab.COMPANY_ID=pa.COMPANY_ID
+	AND ab.BUDGET_ACCOUNT_CODE=pa.BUDGET_ACCOUNT_CODE
+	LEFT JOIN
+	    (
+	        SELECT
+	            aoa.ERP_COMPANY_CODE,
+	            SUM(aoa.ACTUAL_AMOUNT) ACTUAL_AMOUNT,
+	            tb.BUDGET_ACCOUNT_CODE
+	        FROM
+	            tbm_budget_complete_status_data aoa
+	        INNER JOIN
+	            TBM_ACCOUNTING_SUBJECTS sb
+	        ON
+	            sb.ACCOUNTING_SUBJECT_CODE=aoa.ERP_ACC_CODE
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNT_MAP mp
+	        ON
+	            mp.ACCOUNTING_SUBJECT_ID=sb.ACCOUNTING_SUBJECT_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            mp.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            TBM_DIMENSION_MAPS m
+	        ON
+	            m.SOURCE_DIMENSION_VALUE_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            tb
+	        ON
+	            m.TARGET_DIMENSION_VALUE_ID=tb.BUDGET_ACCOUNT_ID
+	        WHERE
+	            sb.ENABLED_FLAG='Y'
+	        AND mp.ENABLED_FLAG='Y'
+	        AND m.ENABLED_FLAG='Y'
+	        AND aoa.PERIOD_NAME='${period_name}'
+	        GROUP BY
+	            aoa.ERP_COMPANY_CODE,
+	            tb.BUDGET_ACCOUNT_CODE)ac
+	ON
+	    ac.ERP_COMPANY_CODE=pa.COMPANY_CODE
+	AND ac.BUDGET_ACCOUNT_CODE=pa.BUDGET_ACCOUNT_CODE
+	LEFT JOIN
+	    (
+	        SELECT
+	            tca.CO_SEG_CODE,
+	            SUM(tca.AMOUNT) AMOUNT,
+	            tb.BUDGET_ACCOUNT_CODE
+	        FROM
+	            TBM_CLAIM_AMOUNT tca
+	        INNER JOIN
+	            TBM_ACCOUNTING_SUBJECTS sb
+	        ON
+	            sb.ACCOUNTING_SUBJECT_CODE=tca.AC_SEG_CODE
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNT_MAP mp
+	        ON
+	            mp.ACCOUNTING_SUBJECT_ID=sb.ACCOUNTING_SUBJECT_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            mp.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            TBM_DIMENSION_MAPS m
+	        ON
+	            m.SOURCE_DIMENSION_VALUE_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            tb
+	        ON
+	            m.TARGET_DIMENSION_VALUE_ID=tb.BUDGET_ACCOUNT_ID
+	        WHERE
+	            sb.ENABLED_FLAG='Y'
+	        AND mp.ENABLED_FLAG='Y'
+	        AND m.ENABLED_FLAG='Y'
+	        AND tca.LAST_UPDATE_TIME BETWEEN TIMESTAMP('${claim_last_update_time_start}') AND TIMESTAMP
+	            ('${claim_last_update_time_end}')
+	        AND tb.BUDGET_ACCOUNT_CODE != 'EBPL010203'
+	        GROUP BY
+	            tca.CO_SEG_CODE,
+	            tb.BUDGET_ACCOUNT_CODE
+	        UNION
+	        SELECT
+	            tca.CO_SEG_CODE,
+	            SUM(tca.AMOUNT) AMOUNT,
+	            tb.BUDGET_ACCOUNT_CODE
+	        FROM
+	            TBM_CLAIM_AMOUNT tca
+	        INNER JOIN
+	            TBM_ACCOUNTING_SUBJECTS sb
+	        ON
+	            sb.ACCOUNTING_SUBJECT_CODE=tca.AC_SEG_CODE
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNT_MAP mp
+	        ON
+	            mp.ACCOUNTING_SUBJECT_ID=sb.ACCOUNTING_SUBJECT_ID
+	        INNER JOIN
+	            TBM_BUDGET_ACCOUNTS c
+	        ON
+	            mp.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            TBM_DIMENSION_MAPS m
+	        ON
+	            m.SOURCE_DIMENSION_VALUE_ID=c.BUDGET_ACCOUNT_ID
+	        INNER JOIN
+	            tb
+	        ON
+	            m.TARGET_DIMENSION_VALUE_ID=tb.BUDGET_ACCOUNT_ID
+	        WHERE
+	            sb.ENABLED_FLAG='Y'
+	        AND mp.ENABLED_FLAG='Y'
+	        AND m.ENABLED_FLAG='Y'
+	        AND tca.LAST_UPDATE_TIME BETWEEN TIMESTAMP('${reward_last_update_time_start}') AND TIMESTAMP
+	            ('${reward_last_update_time_end}')
+	        AND tb.BUDGET_ACCOUNT_CODE='EBPL010203'
+	        GROUP BY
+	            tca.CO_SEG_CODE,
+	            tb.BUDGET_ACCOUNT_CODE )ad
+	ON
+	    ad.CO_SEG_CODE=pa.COMPANY_CODE
+	AND ad.BUDGET_ACCOUNT_CODE=pa.BUDGET_ACCOUNT_CODE
+	WHERE
+	    1=1
+	    <if test="budget_account_code!=null">
+	    and pa.BUDGET_ACCOUNT_CODE like '${budget_account_code}%'
+	    </if>
+	ORDER BY pa.company_id,pa.budget_account_code
+    </select>
+    <select id="getBudgetAccountCode" resultType="Map">
+   WITH
+    tb
+    (
+        BUDGET_ACCOUNT_ID,
+        PARENT_BUDGET_ACCOUNT_ID,
+        BUDGET_ACCOUNT_CODE,
+        BUDGET_ACCOUNT_NAME
+    ) AS
+    (
+        SELECT
+            TBA.BUDGET_ACCOUNT_ID,
+            TBA.PARENT_BUDGET_ACCOUNT_ID,
+            TBA.BUDGET_ACCOUNT_CODE,
+            TBA.BUDGET_ACCOUNT_NAME
+        FROM
+            TBM_TEMPLATES TT
+        LEFT JOIN
+            TBM_TEMPLATE_LAYOUTS TTL
+        ON
+            TT.TEMPLATE_ID=TTL.TEMPLATE_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROW_SETS TTRS
+        ON
+            TTL.TEMPLATE_ROW_SET_ID=TTRS.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROWS TTR
+        ON
+            TTRS.TEMPLATE_ROW_SET_ID=TTR.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_BUDGET_ACCOUNTS TBA
+        ON
+            TTR.DIMENSION_VALUE_ID=TBA.BUDGET_ACCOUNT_ID
+        AND TTRS.BUDGET_ACCOUNT_SET_ID=TBA.BUDGET_ACCOUNT_SET_ID
+        LEFT JOIN
+            TBM_PROPERTIES_SET_VALUE TPSV
+        ON
+            TPSV.PROPERTY_SET_VALUE=TT.TEMPLATE_NUMBER
+        WHERE
+            TPSV.PROPERTY_SET_VALUE_CODE ='HB_CURRENT_TEMPLATE_NUMBER'
+        AND TBA.BUDGET_ACCOUNT_CODE='EBPL01'
+        AND TBA.ENABLED_FLAG='Y'
+        AND TBA.BUDGET_ACCOUNT_CODE != 'EBPL0198'
+        AND TBA.BUDGET_ACCOUNT_CODE != 'EBPL0199'
+        AND TBA.BUDGET_ACCOUNT_CODE != 'EBPL0197'
+        UNION ALL
+        SELECT
+            CHILD.BUDGET_ACCOUNT_ID,
+            CHILD.PARENT_BUDGET_ACCOUNT_ID,
+            CHILD.BUDGET_ACCOUNT_CODE,
+            CHILD.BUDGET_ACCOUNT_NAME
+        FROM
+            tb PARENT ,
+            ( SELECT
+            TBA.BUDGET_ACCOUNT_ID,
+            TBA.PARENT_BUDGET_ACCOUNT_ID,
+            TBA.BUDGET_ACCOUNT_CODE,
+            TBA.BUDGET_ACCOUNT_NAME
+        FROM
+            TBM_TEMPLATES TT
+        LEFT JOIN
+            TBM_TEMPLATE_LAYOUTS TTL
+        ON
+            TT.TEMPLATE_ID=TTL.TEMPLATE_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROW_SETS TTRS
+        ON
+            TTL.TEMPLATE_ROW_SET_ID=TTRS.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_TEMPLATE_ROWS TTR
+        ON
+            TTRS.TEMPLATE_ROW_SET_ID=TTR.TEMPLATE_ROW_SET_ID
+        LEFT JOIN
+            TBM_BUDGET_ACCOUNTS TBA
+        ON
+            TTR.DIMENSION_VALUE_ID=TBA.BUDGET_ACCOUNT_ID
+        AND TTRS.BUDGET_ACCOUNT_SET_ID=TBA.BUDGET_ACCOUNT_SET_ID
+        LEFT JOIN
+            TBM_PROPERTIES_SET_VALUE TPSV
+        ON
+            TPSV.PROPERTY_SET_VALUE=TT.TEMPLATE_NUMBER
+        WHERE
+            TPSV.PROPERTY_SET_VALUE_CODE ='HB_CURRENT_TEMPLATE_NUMBER'
+        ) CHILD
+        WHERE
+            CHILD.PARENT_BUDGET_ACCOUNT_ID=PARENT.BUDGET_ACCOUNT_ID
+    )
+	SELECT BUDGET_ACCOUNT_NAME,
+	       BUDGET_ACCOUNT_CODE
+	  FROM tb
+    </select>
+    <select id="getNetWorkFee" resultType="Map" parameterType="Map">
+     SELECT
+    	t.COMPANY_ID,
+    	t.COMPANY_NAME,
+    	t.BUDGET_ACCOUNT_CODE,
+    	t.BUDGET_ACCOUNT_NAME,
+    	t.TRANSMIT_BUDGET_AMOUNT,
+    	t.APPROVED_BUDGET_AMOUNT,
+    	CASE WHEN t.TRANSMIT_BUDGET_AMOUNT=0 OR t.APPROVED_BUDGET_AMOUNT=0
+    		 THEN 0
+    		 ELSE CAST((10000*t.APPROVED_BUDGET_AMOUNT/t.TRANSMIT_BUDGET_AMOUNT)*0.01 AS DECIMAL(30,2))
+        END AS APPROVED_PRO,
+    	t.OCCUPIED_BUDGET_AMOUNT_SUM,
+    	CASE WHEN t.APPROVED_BUDGET_AMOUNT=0 OR t.OCCUPIED_BUDGET_AMOUNT_SUM=0
+    		 THEN 0
+    		 ELSE CAST((10000*t.OCCUPIED_BUDGET_AMOUNT_SUM/t.APPROVED_BUDGET_AMOUNT)*0.01 AS DECIMAL(30,2))
+    	END AS OCCUPIED_PRO	
+    FROM
+    (
+	    SELECT
+		    ab.COMPANY_ID,
+		    ab.COMPANY_NAME,
+		    ab.BUDGET_ACCOUNT_CODE,
+		    ab.BUDGET_ACCOUNT_NAME,
+		    CAST(COALESCE(ab.TRANSMIT_BUDGET_AMOUNT,0) AS DECIMAL(30,2)) TRANSMIT_BUDGET_AMOUNT,
+		    CASE
+		        WHEN ab.BUDGET_ACCOUNT_CODE='EBPL01010302'
+		        THEN CAST(COALESCE(ac.APPROVED_BUDGET_AMOUNT1,0) AS DECIMAL(30,2))
+		        ELSE CAST(COALESCE(ab.APPROVED_BUDGET_AMOUNT,0) AS DECIMAL(30,2))
+		    END AS APPROVED_BUDGET_AMOUNT,
+		    CASE
+		        WHEN ab.BUDGET_ACCOUNT_CODE='EBPL01010302'
+		        THEN CAST(COALESCE(ac.OCCUPIED_BUDGET_AMOUNT_SUM1,0) AS DECIMAL(30,2))
+		        ELSE CAST(COALESCE(ab.OCCUPIED_BUDGET_AMOUNT_SUM,0) AS DECIMAL(30,2))
+		    END AS OCCUPIED_BUDGET_AMOUNT_SUM
+		FROM
+		    (
+		        SELECT
+		            pa.COMPANY_ID,
+		            tc.company_code,
+		            pa.budget_year,
+		            tc.COMPANY_NAME,
+		            pa.BUDGET_ACCOUNT_CODE,
+		            pa.BUDGET_ACCOUNT_NAME,
+		            0 TRANSMIT_BUDGET_AMOUNT,
+		            pa.APPROVED_BUDGET_AMOUNT,
+		            pa.RESERVED_BUDGET_AMOUNT_SUM,
+		            pa.OCCUPIED_BUDGET_AMOUNT_SUM
+		        FROM
+		            (
+		                SELECT
+		                    a.BUDGET_YEAR,
+		                    a.COMPANY_NATURE_LOOKUP_CODE,
+		                    a.SET_OF_BOOKS_ID,
+		                    a.COMPANY_ID,
+		                    a.BUDGET_TYPE_LOOKUP_CODE ,
+		                    c.BUDGET_ACCOUNT_ID,
+		                    MAX(c.BUDGET_ACCOUNT_NAME) BUDGET_ACCOUNT_NAME,
+		                    MAX(c.BUDGET_ACCOUNT_CODE) BUDGET_ACCOUNT_CODE,
+		                    ROUND(SUM(
+		                        CASE
+		                            WHEN COALESCE(a.APPROVED_BUDGET_AMOUNT, 0) = 0
+		                            THEN MIN(COALESCE(a.INPROCESS_BUDGET_AMOUNT, 0), COALESCE (a.OLD_AMOUNT
+		                                , 0))
+		                            ELSE a.APPROVED_BUDGET_AMOUNT
+		                        END ),2)                      APPROVED_BUDGET_AMOUNT,
+		                    SUM(a.RESERVED_BUDGET_AMOUNT_SUM) RESERVED_BUDGET_AMOUNT_SUM,
+		                    SUM(a.OCCUPIED_BUDGET_AMOUNT_SUM) OCCUPIED_BUDGET_AMOUNT_SUM
+		                FROM
+		                    tbm_budget_project_summary a ,
+		                    TBM_DIMVAL_SUB_COMBINATIONS b ,
+		                    TBM_BUDGET_ACCOUNTS c
+		                WHERE
+		                    1=1
+		                AND a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+		                AND b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+		                AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+		                AND c.BUDGET_ACCOUNT_CODE LIKE 'PL02050101__'
+		                GROUP BY
+		                    a.BUDGET_YEAR,
+		                    a.COMPANY_NATURE_LOOKUP_CODE,
+		                    a.SET_OF_BOOKS_ID,
+		                    a.COMPANY_ID,
+		                    a.BUDGET_TYPE_LOOKUP_CODE,
+		                    c.BUDGET_ACCOUNT_ID)pa
+		        INNER JOIN
+		            TBM_COMPANIES tc
+		        ON
+		            tc.COMPANY_ID = pa.COMPANY_ID
+		        UNION
+		        SELECT
+		            a.COMPANY_ID,
+		            tc.company_code,
+		            a.budget_year,
+		            tc.COMPANY_NAME,
+		            c.BUDGET_ACCOUNT_CODE,
+		            MAX(c.BUDGET_ACCOUNT_NAME)    BUDGET_ACCOUNT_NAME,
+		            SUM(a.TRANSMIT_BUDGET_AMOUNT) TRANSMIT_BUDGET_AMOUNT,
+		            0                             APPROVED_BUDGET_AMOUNT,
+		            0                             RESERVED_BUDGET_AMOUNT_SUM,
+		            0                             OCCUPIED_BUDGET_AMOUNT_SUM
+		        FROM
+		            TBM_BUDGET_ANNUAL_DIMVAL_SUMMARY a
+		        INNER JOIN
+		            TBM_DIMVAL_SUB_COMBINATIONS b
+		        ON
+		            a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+		        INNER JOIN
+		            TBM_BUDGET_ACCOUNTS c
+		        ON
+		            b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+		        INNER JOIN
+		            TBM_COMPANIES tc
+		        ON
+		            tc.COMPANY_ID = a.COMPANY_ID
+		        WHERE
+		            c.BUDGET_ACCOUNT_CODE='EBPL01010302'
+		        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+		        AND a.BUDGET_VERSION_TYPE = 'Z'
+		        GROUP BY
+		            a.budget_year,
+		            a.COMPANY_ID,
+		            tc.company_code,
+		            tc.COMPANY_NAME,
+		            c.BUDGET_ACCOUNT_CODE)ab
+		LEFT JOIN
+		    (
+		        SELECT
+		            a.COMPANY_ID,
+		            ROUND(SUM(
+		                CASE
+		                    WHEN COALESCE(a.APPROVED_BUDGET_AMOUNT, 0) = 0
+		                    THEN MIN(COALESCE(a.INPROCESS_BUDGET_AMOUNT, 0), COALESCE(a.OLD_AMOUNT, 0))
+		                    ELSE a.APPROVED_BUDGET_AMOUNT
+		                END ),2)                      APPROVED_BUDGET_AMOUNT1,
+		            SUM(a.RESERVED_BUDGET_AMOUNT_SUM) RESERVED_BUDGET_AMOUNT_SUM1,
+		            SUM(a.OCCUPIED_BUDGET_AMOUNT_SUM) OCCUPIED_BUDGET_AMOUNT_SUM1
+		        FROM
+		            tbm_budget_project_summary a ,
+		            TBM_DIMVAL_SUB_COMBINATIONS b ,
+		            TBM_BUDGET_ACCOUNTS c
+		        WHERE
+		            1=1
+		        AND a.BUDGET_YEAR=${budget_year}
+		        AND a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+		        AND b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+		        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+		        AND c.BUDGET_ACCOUNT_CODE LIKE 'PL02050101__'
+		        GROUP BY
+		            a.COMPANY_ID )ac
+		ON
+		    ac.company_id=ab.company_id
+		LEFT JOIN
+		    (
+		        SELECT
+		            a.COMPANY_ID,
+		            MAX(tc.COMPANY_NAME) COMPANY_NAME,
+		            c.BUDGET_ACCOUNT_CODE,
+		            MAX(c.BUDGET_ACCOUNT_NAME)    BUDGET_ACCOUNT_NAME,
+		            SUM(a.TRANSMIT_BUDGET_AMOUNT) TRANSMIT_BUDGET_AMOUNT1
+		        FROM
+		            TBM_BUDGET_ANNUAL_DIMVAL_SUMMARY a
+		        INNER JOIN
+		            TBM_DIMVAL_SUB_COMBINATIONS b
+		        ON
+		            a.DIMVAL_SUB_COMBINATION_ID=b.DIMVAL_SUB_COMBINATION_ID
+		        INNER JOIN
+		            TBM_BUDGET_ACCOUNTS c
+		        ON
+		            b.BUDGET_ACCOUNT_ID=c.BUDGET_ACCOUNT_ID
+		        INNER JOIN
+		            TBM_COMPANIES tc
+		        ON
+		            tc.COMPANY_ID = a.COMPANY_ID
+		        WHERE
+		            c.BUDGET_ACCOUNT_CODE='EBPL01010302'
+		        AND a.budget_year=${budget_year}
+		        AND a.BUDGET_TYPE_LOOKUP_CODE = 'OPEX'
+		        AND a.BUDGET_VERSION_TYPE = 'Z'
+		        GROUP BY
+		            a.budget_year,
+		            a.COMPANY_ID,
+		            c.BUDGET_ACCOUNT_CODE)ad
+		ON
+		    ad.COMPANY_ID=ab.COMPANY_ID
+		WHERE 
+		ab.BUDGET_YEAR=${budget_year}
+		<choose>
+	        <when test="companycodes!=null">
+	            AND ab.COMPANY_CODE in (${companycodes})
+	        </when>
+	        <otherwise>
+	            AND ab.COMPANY_CODE in ('')
+	        </otherwise>
+	    </choose>
+	) t
+	ORDER BY
+	    t.COMPANY_ID,
+	    t.BUDGET_ACCOUNT_CODE
+    </select>
+    <select id="getKindItem" resultType="Map" parameterType="Map">
+   SELECT DETAIL,REMARK
+	 FROM ARCH_DIC_ITEM
+	WHERE KIND='USERACCOUNT_COMPANYID'
+	  AND CODE=lower('${userName}')
+	  AND FLAG='Y'
+	  FETCH
+	    FIRST 1 rows only
+    </select>
+    <select id="getUserPermission" parameterType="Map" resultType="String">
+    SELECT
+	    ar.CUST_TEXT09
+	FROM
+	    arch_user au
+	INNER JOIN
+	    ARCH_USER_ROLE aur
+	ON
+	    au.USER_ID=aur.USER_ID
+	INNER JOIN
+	    ARCH_ROLE ar
+	ON
+	    aur.ROLE_ID=ar.ROLE_ID
+	WHERE
+	    au.ACCOUNT=lower('${userName}')
+	ORDER BY
+	    ar.cust_number01
+	FETCH
+	    FIRST 1 rows only
+    </select>
+    <select id="getUserCompany" resultType="Map" parameterType="Map">
+    SELECT DISTINCT
+	    (dept.RESPONSE_DEPARTMENT_NO) AS ORG_CODE,
+	    CASE tc.COMPANY_CODE
+	        WHEN '3511'
+	        THEN '3510'
+	        WHEN '35'
+	        THEN '3510'
+	        WHEN '75'
+	        THEN '3510'
+	        ELSE tc.COMPANY_CODE
+	    END AS COMPANY_CODE,
+	    tc.COMPANY_NAME
+	FROM
+	    arch_user au
+	LEFT JOIN
+	    TBM_INQUIRYDEPTEMPRELATIONINFOSRV dept
+	ON
+	    dept.RESPONSE_EMPLOYEE_NO = au.ACCOUNT
+	LEFT JOIN
+	    arch_users_orgs auo
+	ON
+	    au.user_id=auo.user_id
+	LEFT JOIN
+	    arch_org_ext aoe
+	ON
+	    auo.org_id=aoe.org_id
+	LEFT JOIN
+	    tbm_companies tc
+	ON
+	    aoe.COMPANY_ID=tc.COMPANY_ID
+	LEFT JOIN
+	    arch_user_role aur
+	ON
+	    aur.user_id=au.user_id
+	LEFT JOIN
+	    arch_role ar
+	ON
+	    aur.role_id=ar.role_id
+	WHERE
+	    auo.STATUSE='0'
+	AND tc.enabled_flag = 'Y'
+	AND au.ACCOUNT=lower('${userName}')
+	FETCH
+	    FIRST 1 rows only
+    </select>
+    <select id="getCompanyCodeById" parameterType="Map" resultType="String">
+    SELECT COMPANY_CODE
+      FROM tbm_companies tc
+     WHERE COMPANY_ID=${company_id}
+    </select>
+    <select id="getKeyValue" parameterType="String" resultType="String">
+    SELECT
+	    PROPERTY_SET_VALUE
+	FROM
+	    TBM_PROPERTIES_SET_VALUE
+	WHERE
+	    1=1
+	AND PROPERTY_SET_VALUE_CODE=#{key}
+	ORDER BY
+	    LAST_UPDATE_DATE DESC
+	FETCH
+	    FIRST 1 rows only
+    </select>
+    <select id="getCompanyById" parameterType="Map" resultType="Map">
+    SELECT COMPANY_CODE,COMPANY_NAME
+      FROM tbm_companies tc
+     WHERE COMPANY_ID=${company_id}
+    </select>
+    <select id="getDepartmentInfo" resultType="Map" parameterType="String">
+    SELECT org_ext_id value,org_name name
+      FROM arch_org_ext
+     WHERE org_code=#{org_id}
+    </select>
+    <select id="getArchUserName" resultType="Map" parameterType="Map">
+    SELECT user_name userName FROM ARCH_USER
+    where account=#{userName}
+    </select>
+    <select id="getCount" resultType="int" parameterType="string">
+    SELECT count(*)
+      FROM tbm_budget_complete_status_data d
+      WHERE d.PERIOD_NAME = #{period_name}
+    </select>
+</mapper>

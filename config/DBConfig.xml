@@ -1,38 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<DBConnection> 
-   <DB> 
-      <name>system</name>  
+<DBConnection>
+   <!-- <DB>
+      <name>system</name>
       <driver>oracle.jdbc.OracleDriver</driver>
       <dbtype>Oracle</dbtype>
-      <!--<url>jdbc:oracle:thin:@114.251.247.78:11701:DEV4</url>-->
-      <!-- 湖北测试环境 -->
-	  <url>jdbc:oracle:thin:@172.16.134.129:13201:EBSIT</url>
+      <url>jdbc:oracle:thin:@114.251.247.78:11601:DEV3</url>
+       <url>jdbc:oracle:thin:@172.25.105.78:11701:DEV4</url>
+       <url>jdbc:oracle:thin:@114.251.247.78:11701:DEV4</url>
+       <url>jdbc:oracle:thin:@10.161.32.76:11501:JLPRD</url>
+
+      <url>jdbc:oracle:thin:@172.16.131.138:1521:orcl</url>
+      <url>jdbc:oracle:thin:@10.19.98.242:11581:SDPRD</url>
+      <url>jdbc:oracle:thin:@10.19.110.168:11581:SDPRD</url>
       <username>apps</username>
       <password>Y0pBthERE0A=</password>
-      <maxPoolSize>50</maxPoolSize>  
+      <password>cvxKXOCQNhhShlWDWCuebw==</password>
+      <maxPoolSize>50</maxPoolSize>
       <minPoolSize>3</minPoolSize>
-   </DB>
+  </DB> -->
+
    <DB>
       <name>form</name>
       <dbtype>Mysql</dbtype>
       <driver>com.mysql.cj.jdbc.Driver</driver>
-      <url>jdbc:mysql://localhost:3306/form</url>
+      <!-- <url>jdbc:mysql://114.251.247.113:3306/report</url> -->
+      <url>jdbc:mysql://127.0.0.1:3306/form</url>
+      <!-- <url>jdbc:mysql://10.19.110.170:3306/form</url> -->
+      <!-- <url>jdbc:mysql://172.25.105.113:3306/form</url> -->
       <username>root</username>
-      <password>PyLaXmDHgI8=</password>
+      <password>v600KuCLNBc=</password>
       <maxPoolSize>50</maxPoolSize>
       <minPoolSize>3</minPoolSize>
    </DB>
-   <!--
    <DB>
-      <name>budget</name>
-      <driver>com.ibm.db2.jcc.DB2Driver</driver>
-      <dbtype>DB2</dbtype>
-      <username>tbmprd</username>
-      <url>jdbc:db2://139.129.30.106:50001/tbmdbeb</url>
-      <password>PyLaXmDHgI8=</password>-->
-      <!--<url>jdbc:db2://10.25.140.139:5001/tbmprd</url>--><!-- 生产 -->
-      <!--<password>h5mmVLEcqGglgRLWg0vusA==</password>--><!-- 生产 -->
-   <!--<maxPoolSize>50</maxPoolSize>
-   <minPoolSize>3</minPoolSize>
-</DB>-->
+      <name>jlerp</name>
+      <dbtype>Mysql</dbtype>
+      <driver>com.mysql.cj.jdbc.Driver</driver>
+      <!-- <url>jdbc:mysql://114.251.247.113:3306/report</url> -->
+      <url>jdbc:mysql://127.0.0.1:3306/jlerp</url>
+      <!-- <url>jdbc:mysql://10.19.110.170:3306/form</url> -->
+      <!-- <url>jdbc:mysql://172.25.105.113:3306/form</url> -->
+      <username>root</username>
+      <password>v600KuCLNBc=</password>
+      <maxPoolSize>50</maxPoolSize>
+      <minPoolSize>3</minPoolSize>
+   </DB>
+   <!-- <DB>
+       <dbtype>mongoDB</dbtype>
+       <name>rcmDB</name>
+       <url>114.251.247.113:27017</url>
+       <driver></driver>
+       <username></username>
+       <password></password>
+       <maxPoolSize></maxPoolSize>
+       <minPoolSize></minPoolSize>
+   </DB> -->
+   <!-- <DB> <name>预算服务器</name> <driver>com.ibm.db2.jcc.DB2Driver</driver>
+       <dbtype>DB2</dbtype> <url>jdbc:db2://139.129.30.106:50001/tbmdbeb</url> <username>tbmprd</username>
+       <password>PyLaXmDHgI8=</password> <maxPoolSize>50</maxPoolSize> <minPoolSize>3</minPoolSize>
+       </DB> -->
 </DBConnection>
